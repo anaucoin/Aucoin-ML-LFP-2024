@@ -40,9 +40,9 @@ parser.add_argument('--r', '--region',metavar='region', default='amygdala', type
 parser.add_argument('--bm','--basemodality', default='touch', type=str, metavar='basemodality', help='modality of baseline')
 parser.add_argument('--w', metavar='w', default=5, type=int, help='Morlet wavelet transform main frequency')
 parser.add_argument('--epochs',metavar='epochs', default=30, type=int, help='number of total epochs to run')
-parser.add_argument('--bs', default=15, type=int, metavar='batchsize', help='training batch size')
+parser.add_argument('--bs', default=10, type=int, metavar='batchsize', help='training batch size')
 parser.add_argument('--nwin', default=256, type=int, metavar='nwin', help='number of windows for spectrogram')
-parser.add_argument('--divfs', default=50, type=int, metavar='divfs',
+parser.add_argument('--divfs', default=10, type=int, metavar='divfs',
                                         help='scaling number to determine total frequencies in spectrogram')
 parser.add_argument('--m', default='ged', type=str, metavar='model',
                                         help='sets the reduced order model type')
@@ -352,10 +352,10 @@ if __name__ ==  '__main__':
     print('Execution time in seconds: ' + str(executionTime))
 
     if args.save:
-        PATH = sessdate+args.m +'_df'+ str(args.divfs) + 'divfs' + str(args.divfs)+ 'nwin' + str(args.nwin)+ '.pth'
+        PATH = sessdate + '/' + sessdate+args.m +'_df'+ str(args.divfs) + 'divfs' + str(args.divfs)+ 'nwin' + str(args.nwin)+ '.pth'
         torch.save(net.state_dict(), PATH)
     
-        sfilename = sessdate+args.m +'_df'+ str(args.divfs) + 'divfs' + str(args.divfs)+ 'nwin' + str(args.nwin)+'.npz'
+        sfilename = sessdate + '/' + sessdate+args.m +'_df'+ str(args.divfs) + 'divfs' + str(args.divfs)+ 'nwin' + str(args.nwin)+'.npz'
         np.savez(sfilename, nepochs = args.epochs,perms=perms, splits = splits, nwin=args.nwin, w = args.w, t = t,batchsize=args.bs, allow_pickle=True)
 
 
