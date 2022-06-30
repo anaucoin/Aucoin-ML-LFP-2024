@@ -24,6 +24,7 @@ from scipy.io import loadmat
 import pickle
 import matplotlib.pyplot as plt
 from scipy import signal
+import csv
 
 import gc
 gc.collect()
@@ -166,7 +167,7 @@ if __name__ ==  '__main__':
     if use_cuda: 
         args = parser.parse_args()
     else: 
-        args = Namespace(d=5, r='3b', bm = 'touch', w = 5, epochs = 15, bs = 30, nwin = 256, divfs = 50, m= 'ged')
+        args = Namespace(d=5, r='3b', bm = 'touch', w = 5, epochs = 15, bs = 30, nwin = 256, divfs = 50, m= 'ged', save = False)
 
     dates = ['060619','061019','061319','061819','062019','062419','070819','071019','071219','071619','071819','080619'];
     num_days = len(dates)
@@ -401,4 +402,7 @@ if __name__ ==  '__main__':
         accuracy = 100 * float(correct_count) / total_pred[classname]
         print(f'Accuracy for class: {classname:5s} is {accuracy:.2f} %')
 
-
+    if args.save:
+        with open('lfpnetlog.csv', 'w', encoding='UTF8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([sessdate, args.d, args.r, args.m, args.bm, args.w, args.nwin,args.divfs, (freq[0],freq[-1]), args.bs, args.epochs,100 * correct // total,100*float(correct_pred['touch']) / total_pred['touch'],100* float(correct_pred['puff']) / total_pred['puff'],  PATH ])
