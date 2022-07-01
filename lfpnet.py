@@ -298,9 +298,9 @@ if __name__ ==  '__main__':
     trainloader = torch.utils.data.DataLoader(
         traindata, batch_size=args.bs, shuffle=True, num_workers=1)
     valloader = torch.utils.data.DataLoader(
-        valdata, batch_size=args.bs, shuffle=True, num_workers=1)
+        valdata, batch_size=np.shape(valtags)[0], shuffle=True, num_workers=1)
     testloader = torch.utils.data.DataLoader(
-        testdata, batch_size=args.bs, shuffle=False, num_workers=1)
+        testdata, batch_size=np.shape(testtags)[0], shuffle=False, num_workers=1)
 
     epochs = args.epochs
     min_valid_loss = np.inf
