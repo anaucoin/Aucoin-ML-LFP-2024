@@ -298,9 +298,9 @@ if __name__ ==  '__main__':
     trainloader = torch.utils.data.DataLoader(
         traindata, batch_size=args.bs, shuffle=True, num_workers=1)
     valloader = torch.utils.data.DataLoader(
-        valdata, batch_size=np.shape(valtags)[0], shuffle=True, num_workers=1)
+        valdata, batch_size=20, shuffle=True, num_workers=1)
     testloader = torch.utils.data.DataLoader(
-        testdata, batch_size=np.shape(testtags)[0], shuffle=False, num_workers=1)
+        testdata, batch_size=20, shuffle=False, num_workers=1)
 
     epochs = args.epochs
     min_valid_loss = np.inf
@@ -403,6 +403,6 @@ if __name__ ==  '__main__':
         print(f'Accuracy for class: {classname:5s} is {accuracy:.2f} %')
 
     if args.save:
-        with open('lfpnetlog.csv', 'w', encoding='UTF8', newline='') as f:
+        with open('lfpnetlog.csv', 'a', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([sessdate, args.d, args.r, args.m, args.bm, args.w, args.nwin,args.divfs, (freq[0],freq[-1]), args.bs, args.epochs,100 * correct // total,100*float(correct_pred['touch']) / total_pred['touch'],100* float(correct_pred['puff']) / total_pred['puff'],  PATH ])
