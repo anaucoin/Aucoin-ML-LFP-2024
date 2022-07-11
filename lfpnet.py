@@ -41,13 +41,16 @@ parser.add_argument('--r', '--region',metavar='region', default='amygdala', type
 parser.add_argument('--bm','--basemodality', default='touch', type=str, metavar='basemodality', help='modality of baseline')
 parser.add_argument('--w', metavar='w', default=5, type=int, help='Morlet wavelet transform main frequency')
 parser.add_argument('--epochs',metavar='epochs', default=30, type=int, help='number of total epochs to run')
+parser.add_argument('--lr', default=.001, type=float, metavar='lr',
+                                        help='learning rate')
 parser.add_argument('--bs', default=10, type=int, metavar='batchsize', help='training batch size')
 parser.add_argument('--nwin', default=256, type=int, metavar='nwin', help='number of windows for spectrogram')
 parser.add_argument('--divfs', default=10, type=int, metavar='divfs',
                                         help='scaling number to determine total frequencies in spectrogram')
 parser.add_argument('--m', default='ged', type=str, metavar='model',
                                         help='sets the reduced order model type')
-
+parser.add_argument('--csv', default='lfpnetlog', type=str, metavar='csvname',
+                                        help='output csv file name')
 
 # -
 
@@ -167,7 +170,7 @@ if __name__ ==  '__main__':
     if use_cuda: 
         args = parser.parse_args()
     else: 
-        args = Namespace(d=5, r='3b', bm = 'touch', w = 5, epochs = 15, bs = 30, nwin = 256, divfs = 50, m= 'ged', save = False)
+        args = Namespace(d=5, r='3b', bm = 'touch', w = 5, epochs = 15,lr = 0.001, bs = 30, nwin = 256, divfs = 50, m= 'ged',csv = 'lfpnetlog.csv', save = False)
 
     dates = ['060619','061019','061319','061819','062019','062419','070819','071019','071219','071619','071819','080619'];
     num_days = len(dates)
@@ -289,7 +292,7 @@ if __name__ ==  '__main__':
     net = net.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=0.001)
+    optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
     traindata = torch.utils.data.TensorDataset(trainset, traintags)
     valdata = torch.utils.data.TensorDataset(valset, valtags)
@@ -353,11 +356,11 @@ if __name__ ==  '__main__':
     print('Execution time in seconds: ' + str(executionTime))
 
     if args.save:
-        PATH = sessdate + '/' + sessdate+args.m +'_df'+ str(args.divfs) + 'divfs' + str(args.divfs)+ 'nwin' + str(args.nwin)+ '.pth'
-        torch.save(net.state_dict(), PATH)
+        PATH = sessdate + '/' + args.r[:2]+ sessdate+args.m +'_' + args.bm[0] +str(args.bs) +'_' + str(args.lr) + '_'+ str(args.divfs) + '_' + str(args.nwin)+ '.pth'
+#        torch.save(net.state_dict(), PATH)
     
-        sfilename = sessdate + '/' + sessdate+args.m +'_df'+ str(args.divfs) + 'divfs' + str(args.divfs)+ 'nwin' + str(args.nwin)+'.npz'
-        np.savez(sfilename, nepochs = args.epochs,perms=perms, splits = splits, nwin=args.nwin, w = args.w, t = t,batchsize=args.bs, allow_pickle=True)
+        sfilename = sessdate + '/' + args.r[:2]+ sessdate+args.m +'_' + args.bm[0] +str(args.bs) +'_' + str(args.lr) + '_'+ str(args.divfs) + '_' + str(args.nwin)+'.npz'
+#        np.savez(sfilename, nepochs = args.epochs,perms=perms, splits = splits, nwin=args.nwin, w = args.w, t = t,batchsize=args.bs, allow_pickle=True)
 
 
     correct = 0
@@ -403,6 +406,6 @@ if __name__ ==  '__main__':
         print(f'Accuracy for class: {classname:5s} is {accuracy:.2f} %')
 
     if args.save:
-        with open('lfpnetlog.csv', 'a', encoding='UTF8', newline='') as f:
+        with open(args.csv, 'a', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([sessdate, args.d, args.r, args.m, args.bm, args.w, args.nwin,args.divfs, (freq[0],freq[-1]), args.bs, args.epochs,100 * correct // total,100*float(correct_pred['touch']) / total_pred['touch'],100* float(correct_pred['puff']) / total_pred['puff'],  PATH ])
+            writer.writerow([sessdate, args.d, args.r, args.m, args.bm, args.w, args.nwin,args.divfs, (freq[0],freq[-1]),args.lr, args.bs, args.epochs,100 * correct // total,100*float(correct_pred['touch']) / total_pred['touch'],100* float(correct_pred['puff']) / total_pred['puff'],  PATH ])
