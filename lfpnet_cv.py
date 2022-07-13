@@ -77,7 +77,7 @@ def reset_weights(m):
   '''
   for layer in m.children():
     if hasattr(layer, 'reset_parameters'):
-        print(f'Reset trainable parameters of layer = {layer}')
+        # print(f'Reset trainable parameters of layer = {layer}')
         layer.reset_parameters()
     
 def getfinsize(wid, leng, constride, poolstride):
@@ -268,9 +268,13 @@ if __name__ ==  '__main__':
     touchind = np.where(tags == 'touch')
     numpuff = np.size(puffind)
     numtouch = np.size(touchind)
-
+    diff = numpuff-numtouch
+    
+    #sample touch to have same number of trials as puff 
     puff = specdata[puffind[0],:]
-    touch = specdata[touchind[0],:]
+    touch = np.vstack((specdata[touchind[0],:], specdata[np.random.permutation(numtouch)[:diff],:]))
+    numtouch = numpuff
+
     if not args.stand:
         puff = (puff - puff.min())/(puff.max() - puff.min())
         touch = (touch - touch.min())/(touch.max() - touch.min())
@@ -280,15 +284,6 @@ if __name__ ==  '__main__':
     perms =  (rand.permutation(numpuff), rand.permutation(numtouch))
 
     trainset, testset, traintags, testtags = getdatasplits(splits, perms, puff, touch)
-
-    ptrain = rand.permutation(np.shape(traintags)[0])
-    ptest = rand.permutation(np.shape(testtags)[0])
-    
-    trainset = trainset[ptrain,:,:,:]
-    traintags = traintags[ptrain]
-
-    testset = testset[ptest,:,:,:]
-    testtags = testtags[ptest]
 
     wid = np.shape(trainset)[2]
     leng = np.shape(trainset)[3]
@@ -312,12 +307,11 @@ if __name__ ==  '__main__':
         train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
         test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
         
-        
         trainloader = torch.utils.data.DataLoader(
         dataset, batch_size=args.bs, sampler = train_subsampler)
         
         testloader = torch.utils.data.DataLoader(
-        dataset, batch_size=20, sampler=test_subsampler)
+        dataset, batch_size=25, sampler=test_subsampler)
     
         net = LFPnet(finsize = finsize, constride = constride, poolstride = poolstride)
         net.apply(reset_weights)
@@ -350,9 +344,9 @@ if __name__ ==  '__main__':
 
                 # print statistics
                 train_loss += loss.item()
-                if i % 5 == 4:
-                    print('Loss after mini-batch %5d: %.3f' %
-                          (i + 1, train_loss / 5 ))
+                if i % 10 == 9:
+                   # print('Loss after mini-batch %5d: %.3f' %
+                          #(i + 1, train_loss / 5 ))
                     train_loss = 0.0
 
             print('Training finished. Saving model and starting testing...')
@@ -389,11 +383,11 @@ if __name__ ==  '__main__':
                         total_pred[classes[label]] += 1
 
             # Print accuracy
-            print('Accuracy for fold %d: %d %%' % (fold, 100.0 * correct / total))
+            #print('Accuracy for fold %d: %d %%' % (fold, 100.0 * correct / total))
             for classname, correct_count in correct_pred.items():
                 accuracy = 100 * float(correct_count) / total_pred[classname]
-                print(f'Accuracy for class: {classname:5s} is {accuracy:.2f} %')
-            print('--------------------------------')
+                #print(f'Accuracy for class: {classname:5s} is {accuracy:.2f} %')
+            #print('--------------------------------')
             results[fold] = 100.0 * (correct / total)
             class_results[fold] = {'touch acc' : 100 * float(correct_pred['touch']) / total_pred['touch'],
                                    'puff acc': 100 * float(correct_pred['puff']) / total_pred['puff']}
@@ -410,14 +404,12 @@ if __name__ ==  '__main__':
     touchsum = 0.0
     for folds, class_pred in class_results.items():
         touchsum += class_pred['touch acc']
-        puffsum += class_pred['touch acc']
+        puffsum += class_pred['puff acc']
     touchacc = touchsum/args.k
     puffacc = puffsum/args.k
 
     executionTime = (time.time() - startTime)
     print('Execution time in seconds: ' + str(executionTime))
-
-
 
     if args.save:
         with open(args.csv, 'a', encoding='UTF8', newline='') as f:
@@ -426,6 +418,4 @@ if __name__ ==  '__main__':
                              args.seg,args.stand, args.w, args.nwin,
                              args.divfs, (freq[0],freq[-1]),args.lr, 
                              args.bs, args.k, args.epochs, sum/len(results.items()),
-                             touchacc, puffacc,  PATH ])
-
-
+                             results, class_results,  PATH ])
