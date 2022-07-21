@@ -25,6 +25,8 @@ import pickle
 import matplotlib.pyplot as plt
 from scipy import signal
 import csv
+from torch.utils.data import DataLoader, ConcatDataset
+import torch.utils.data as dta 
 
 import gc
 gc.collect()
@@ -39,11 +41,12 @@ parser.set_defaults(save=True)
 parser.add_argument('--d','--day', metavar='d', default=2, type=int, help='date of experiment')
 parser.add_argument('--r', '--region',metavar='region', default='amygdala', type=str, help='region (i.e. amygdala vs cortex)')
 parser.add_argument('--bm','--basemodality', default='touch', type=str, metavar='basemodality', help='modality of baseline')
+parser.add_argument('--seg', default='base', type=str, metavar='seg', help='segment of lfp (e.g. base, stim, full)')
 parser.add_argument('--w', metavar='w', default=5, type=int, help='Morlet wavelet transform main frequency')
 parser.add_argument('--epochs',metavar='epochs', default=30, type=int, help='number of total epochs to run')
-parser.add_argument('--lr', default=.001, type=float, metavar='lr',
+parser.add_argument('--lr', default=.0001, type=float, metavar='lr',
                                         help='learning rate')
-parser.add_argument('--bs', default=10, type=int, metavar='batchsize', help='training batch size')
+parser.add_argument('--bs', default=5, type=int, metavar='batchsize', help='training batch size')
 parser.add_argument('--nwin', default=256, type=int, metavar='nwin', help='number of windows for spectrogram')
 parser.add_argument('--divfs', default=10, type=int, metavar='divfs',
                                         help='scaling number to determine total frequencies in spectrogram')
@@ -51,6 +54,9 @@ parser.add_argument('--m', default='ged', type=str, metavar='model',
                                         help='sets the reduced order model type')
 parser.add_argument('--csv', default='lfpnetlog', type=str, metavar='csvname',
                                         help='output csv file name')
+parser.add_argument('--scaler', default='minmax', type=str, metavar='scaler',
+                                        help='choice of minmax or stand. scaler')
+
 
 # -
 
@@ -108,16 +114,35 @@ class LFPnet(nn.Module):
 
 # +
 #some useful functions
-def getfinsize(wid, leng, constride, poolstride):
+def reset_weights(m):
+  '''
+    Try resetting model weights to avoid
+    weight leakage.
+  '''
+  for layer in m.children():
+    if hasattr(layer, 'reset_parameters'):
+        # print(f'Reset trainable parameters of layer = {layer}')
+        layer.reset_parameters()
+        
+def getfinsize(wid, leng, constride, poolstride, nlayers):
+    '''
+      Determine fully connected layer size based on 
+      model configuration. Note: This assumes network has
+      LFPnet layer blocks
+      (e.g. CONV2D, BatchNorm, CONV2D,MaxPool, BatchNorm)
+    '''
     finwid = wid 
     finleng = leng
     confact = 2*(2*constride) # 2*constride decrease per layer * 2 layers per block 
-    for i in range(3): #total of 3 blocks
+    for i in range(nlayers): #total of 3 blocks
         finwid = int((finwid-confact)/poolstride)
         finleng = int((finleng-confact)/poolstride)
     return finwid*finleng
 
 def getdatasplits(splits, perms, puff, touch):
+    '''
+        Randomly split data into train and test set. 
+    '''
     numtouch = np.shape(touch)[0]
     numtrain = int(numtouch*splits[0])
     numval = int(numtouch*splits[1])
@@ -170,12 +195,16 @@ if __name__ ==  '__main__':
     if use_cuda: 
         args = parser.parse_args()
     else: 
-        args = Namespace(d=5, r='3b', bm = 'touch', w = 5, epochs = 15,lr = 0.001, bs = 30, nwin = 256, divfs = 50, m= 'ged',csv = 'lfpnetlog.csv', save = False)
+        args = Namespace(d=5, r='amygdala', bm = 'touch',
+                         seg='base',w = 5,epochs = 30,lr = 0.001, 
+                         bs = 30, nwin = 256, divfs = 10, m= 'ged',
+                         csv = 'standstats.csv', scaler='none', save = True)
+
+    # set manual random seed (useful for debugging/analysis during training)
+    torch.manual_seed(42)
 
     dates = ['060619','061019','061319','061819','062019','062419','070819','071019','071219','071619','071819','080619'];
     num_days = len(dates)
-    train_acc = np.empty(num_days)
-    test_acc = np.empty(num_days)
 
     sessdate = dates[args.d]
 
@@ -214,7 +243,13 @@ if __name__ ==  '__main__':
     oldn = np.shape(olddata)[2]
     oldt, dt = np.linspace(-1,1,oldn, retstep = True)
 
-    bind = range(200,701)
+    if args.seg == 'full':
+        bind = range(700,1301)
+    elif args.seg == 'base':
+        bind = range(200,701) 
+    else:
+        bind = range(1000,len(oldt))
+
     t = oldt[bind]
 
     #collecting the right cells 
@@ -240,27 +275,24 @@ if __name__ ==  '__main__':
     freq = np.linspace(1,fs/args.divfs, args.nwin)
     widths = args.w*fs / (2*freq*np.pi)
 
+    specdata = np.empty((numtrials, args.nwin,lent), dtype= np.float64)
+    for i in range(numtrials):
+        specdata[i,:] = abs(signal.cwt(geddata[i,:], signal.morlet2, widths, w=args.w))
+
     puffind = np.where(tags == 'puff')
     touchind = np.where(tags == 'touch')
     numpuff = np.size(puffind)
     numtouch = np.size(touchind)
-
-    puff = np.empty((numpuff, args.nwin,lent), dtype= np.float64)
-    touch = np.empty((numtouch, args.nwin,lent), dtype = np.float64)
-
-    for i in range(numpuff):
-        sig = geddata[puffind[0][i],:]
-        puff[i,:,:] = abs(signal.cwt(sig, signal.morlet2, widths, w=args.w))
-
-    for i in range(numtouch):
-        sig = geddata[touchind[0][i],:]
-        touch[i,:,:] = abs(signal.cwt(sig, signal.morlet2, widths, w=args.w))
-
-    mn = np.concatenate((puff,touch), axis=0).mean()
-    std = np.concatenate((puff,touch), axis=0).std()
-
-    puff = (puff-mn)/std
-    touch = (touch-mn)/std
+    diff = numpuff-numtouch
+    
+    #sample touch to have same number of trials as puff 
+    puff = specdata[puffind[0],:]
+    if numtouch < diff:
+        newdiff = diff-numtouch
+        touch = np.vstack((specdata[touchind[0],:], specdata[touchind[0],:], specdata[np.random.permutation(numtouch)[:newdiff],:]))
+    else: 
+        touch = np.vstack((specdata[touchind[0],:], specdata[np.random.permutation(numtouch)[:diff],:]))
+    numtouch = numpuff
 
     # set up data for training 
     splits = [.8, .1, .1]
@@ -268,23 +300,31 @@ if __name__ ==  '__main__':
 
     trainset, valset, testset, traintags, valtags, testtags = getdatasplits(splits, perms, puff, touch)
 
-    ptrain = rand.permutation(np.shape(traintags)[0])
-    pval = rand.permutation(np.shape(valtags)[0])
-    ptest = rand.permutation(np.shape(testtags)[0])
-    
-    trainset = trainset[ptrain,:,:,:]
-    traintags = traintags[ptrain]
-    valset = valset[pval, :, :,:]
-    valtags = valtags[pval]
-    testset = testset[ptest,:,:,:]
-    testtags = testtags[ptest]
-
     wid = np.shape(trainset)[2]
     leng = np.shape(trainset)[3]
     constride = 1
     poolstride = 2
 
-    finsize = getfinsize(wid, leng, constride, poolstride)
+    finsize = getfinsize(wid, leng, constride, poolstride, 3)
+
+    if args.scaler == 'minmax':
+        from sklearn.preprocessing import MinMaxScaler
+        scaler = MinMaxScaler()
+        trainset[:,0,:,:] = torch.from_numpy(scaler.fit_transform(trainset[:,0,:,:].reshape(-1, trainset[:,0,:,:].shape[-1])).reshape(trainset[:,0,:,:].shape))
+        valset[:,0,:,:] = torch.from_numpy(scaler.transform(valset[:,0,:,:].reshape(-1, valset[:,0,:,:].shape[-1])).reshape(valset[:,0,:,:].shape))
+        testset[:,0,:,:] = torch.from_numpy(scaler.transform(testset[:,0,:,:].reshape(-1, testset[:,0,:,:].shape[-1])).reshape(testset[:,0,:,:].shape))
+    elif args.scaler == 'stand':
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        trainset[:,0,:,:] = torch.from_numpy(scaler.fit_transform(trainset[:,0,:,:].reshape(-1, trainset[:,0,:,:].shape[-1])).reshape(trainset[:,0,:,:].shape))
+        valset[:,0,:,:] = torch.from_numpy(scaler.transform(valset[:,0,:,:].reshape(-1, valset[:,0,:,:].shape[-1])).reshape(valset[:,0,:,:].shape))
+        testset[:,0,:,:] = torch.from_numpy(scaler.transform(testset[:,0,:,:].reshape(-1, testset[:,0,:,:].shape[-1])).reshape(testset[:,0,:,:].shape))
+    else: 
+        print('Did not scale data.')
+
+    traindata = torch.utils.data.TensorDataset(trainset, traintags)
+    valdata = torch.utils.data.TensorDataset(valset, valtags)
+    testdata = torch.utils.data.TensorDataset(testset, testtags)
 
     net = LFPnet(finsize = finsize, constride = constride, poolstride = poolstride)
 
@@ -294,17 +334,14 @@ if __name__ ==  '__main__':
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
-    traindata = torch.utils.data.TensorDataset(trainset, traintags)
-    valdata = torch.utils.data.TensorDataset(valset, valtags)
-    testdata = torch.utils.data.TensorDataset(testset, testtags)
-
     trainloader = torch.utils.data.DataLoader(
         traindata, batch_size=args.bs, shuffle=True, num_workers=1)
     valloader = torch.utils.data.DataLoader(
-        valdata, batch_size=20, shuffle=True, num_workers=1)
-    testloader = torch.utils.data.DataLoader(
-        testdata, batch_size=20, shuffle=False, num_workers=1)
+        valdata, batch_size=args.bs, shuffle=True, num_workers=1)
 
+    trainhistory = []
+    valhistory = []
+    
     epochs = args.epochs
     min_valid_loss = np.inf
     
@@ -329,6 +366,8 @@ if __name__ ==  '__main__':
 
             # print statistics
             train_loss += loss.item()
+            
+        trainhistory.append(train_loss)
 
         valid_loss = 0.0 
         net.eval() #let model know we're in evaluation mode
@@ -340,15 +379,17 @@ if __name__ ==  '__main__':
             target = net(inputs)
             loss = criterion(target, labels)
             valid_loss += loss.item()
-                
+            
+        valhistory.append(valid_loss)      
                 
         print(f'Epoch {e+1} \t\t Training Loss: {train_loss / len(trainloader)} \t\t Validation Loss: {valid_loss / len(valloader)}')
         if min_valid_loss > valid_loss:
             print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f}) \t Saving The Model')
             min_valid_loss = valid_loss
             
-            # Saving State Dict
-            #torch.save(net.state_dict(), 'saved_model.pth')
+            #Saving State Dict
+            PATH = 'savestats/' + args.r[:2]+ sessdate+args.m +'_' + args.bm[0] +str(args.bs) +'_' + str(args.lr) + '_'+ str(args.divfs) + '_' + str(args.nwin)+ '.pth'
+            torch.save(net.state_dict(), PATH)
 
     print('Finished Training')
 
@@ -356,13 +397,18 @@ if __name__ ==  '__main__':
     print('Execution time in seconds: ' + str(executionTime))
 
     if args.save:
-        PATH = sessdate + '/' + args.r[:2]+ sessdate+args.m +'_' + args.bm[0] +str(args.bs) +'_' + str(args.lr) + '_'+ str(args.divfs) + '_' + str(args.nwin)+ '.pth'
+        PATH = f'savestats/{args.r[:2]}{args.seg}{sessdate}{args.m}_{args.bm[0]}{args.bs}_{args.lr}_{args.divfs}_{args.nwin}.pth'
 #        torch.save(net.state_dict(), PATH)
     
-        sfilename = sessdate + '/' + args.r[:2]+ sessdate+args.m +'_' + args.bm[0] +str(args.bs) +'_' + str(args.lr) + '_'+ str(args.divfs) + '_' + str(args.nwin)+'.npz'
+        sfilename = f'savestats/{args.r[:2]}{args.seg}{sessdate}{args.m}_{args.bm[0]}{args.bs}_{args.lr}_{args.divfs}_{args.nwin}.npz'
 #        np.savez(sfilename, nepochs = args.epochs,perms=perms, splits = splits, nwin=args.nwin, w = args.w, t = t,batchsize=args.bs, allow_pickle=True)
 
 
+    gc.collect()
+
+    testloader = torch.utils.data.DataLoader(
+        testdata, batch_size=args.bs, shuffle=True, num_workers=1)
+    
     correct = 0
     total = 0
 
@@ -405,7 +451,18 @@ if __name__ ==  '__main__':
         accuracy = 100 * float(correct_count) / total_pred[classname]
         print(f'Accuracy for class: {classname:5s} is {accuracy:.2f} %')
 
+    history = {'train': trainhistory, 'val': valhistory}
+
     if args.save:
         with open(args.csv, 'a', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([sessdate, args.d, args.r, args.m, args.bm, args.w, args.nwin,args.divfs, (freq[0],freq[-1]),args.lr, args.bs, args.epochs,100 * correct // total,100*float(correct_pred['touch']) / total_pred['touch'],100* float(correct_pred['puff']) / total_pred['puff'],  PATH ])
+            writer.writerow([sessdate, args.d, args.r, args.m, 
+                             args.bm, args.seg, args.scaler, args.w, 
+                             args.nwin,args.divfs, (freq[0],freq[-1]),
+                             args.lr, args.bs, args.epochs,
+                             100 * correct // total,100*float(correct_pred['touch']) / total_pred['touch'],100* float(correct_pred['puff']) / total_pred['puff'],  PATH ])
+
+    if device == 'cpu':
+        plt.plot(np.array(trainhistory)/len(trainloader), label='train')
+        plt.plot(np.array(valhistory)/len(valloader), label = 'val')
+        plt.legend()
