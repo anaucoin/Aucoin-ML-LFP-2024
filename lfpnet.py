@@ -38,6 +38,10 @@ parser.add_argument('--save', action='store_true')
 parser.add_argument('--nosave', dest='save', action='store_false')
 parser.set_defaults(save=True)
 
+parser.add_argument('--pearson', action='store_true')
+parser.add_argument('--nopearson', dest='pearson', action='store_false')
+parser.set_defaults(pearson=True)
+
 parser.add_argument('--d','--day', metavar='d', default=2, type=int, help='date of experiment')
 parser.add_argument('--r', '--region',metavar='region', default='amygdala', type=str, help='region (i.e. amygdala vs cortex)')
 parser.add_argument('--bm','--basemodality', default='touch', type=str, metavar='basemodality', help='modality of baseline')
@@ -195,10 +199,10 @@ if __name__ ==  '__main__':
     if use_cuda: 
         args = parser.parse_args()
     else: 
-        args = Namespace(d=5, r='amygdala', bm = 'touch',
-                         seg='base',w = 5,epochs = 30,lr = 0.001, 
+        args = Namespace(d=9, r='amygdala', bm = 'touch',
+                         seg='base',w = 5,epochs = 30,lr = 0.0001, 
                          bs = 30, nwin = 256, divfs = 10, m= 'ged',
-                         csv = 'standstats.csv', scaler='none', save = True)
+                         csv = 'standstats.csv', scaler='none', save = True, pearson = False)
 
     # set manual random seed (useful for debugging/analysis during training)
     torch.manual_seed(42)
@@ -220,16 +224,28 @@ if __name__ ==  '__main__':
 
     tags = df['modality']
 
-    if use_cuda:
-        if args.r == 'amygdala':
-            sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_pearsonrged_maps.npz'
+    if args.pearson: 
+        if use_cuda:
+            if args.r == 'amygdala':
+                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_pearsonrged_maps.npz'
+            else:
+                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_pearsonrged_maps_3b.npz'
         else:
-            sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_pearsonrged_maps_3b.npz' 
-    else:
-        if args.r == 'amygdala':
-            sfilename = 'RMC_pearsonrged_maps.npz'
+            if args.r == 'amygdala':
+                sfilename = 'RMC_pearsonrged_maps.npz'
+            else:
+                sfilename = 'RMC_pearsonrged_maps_3b.npz'   
+    else: 
+        if use_cuda:
+            if args.r == 'amygdala':
+                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_ged_maps_amygdala.npz'
+            else:
+                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_ged_maps_3b.npz'
         else:
-            sfilename = 'RMC_pearsonrged_maps_3b.npz' 
+            if args.r == 'amygdala':
+                sfilename = 'RMC_ged_maps_amygdala.npz'
+            else:
+                sfilename = 'RMC_ged_maps_3b.npz'  
 
     with np.load(sfilename, allow_pickle=True) as alldata:
         puffmaps = alldata['puffmaps']
@@ -456,7 +472,7 @@ if __name__ ==  '__main__':
     if args.save:
         with open(args.csv, 'a', encoding='UTF8', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([sessdate, args.d, args.r, args.m, 
+            writer.writerow([sessdate, args.d, args.r, args.pearson, args.m, 
                              args.bm, args.seg, args.scaler, args.w, 
                              args.nwin,args.divfs, (freq[0],freq[-1]),
                              args.lr, args.bs, args.epochs,
