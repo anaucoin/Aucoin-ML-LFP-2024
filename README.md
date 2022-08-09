@@ -7,6 +7,8 @@ Details on LFPNet can be found in Golshan, Hebb, and  Mahoor. LFP-Net: A deep le
 Make sure you are in a folder with the lfpnet.py script and data in the .npz format.
 The script can be run from command line with the default parameters by calling the script name:
 
+NOTE: Currenlty, these flags are only supported when use_cuda is available. To change the inputs on personal machine, one can update the initialization of the Namespace object (args). 
+
 >  python lfpnet.py 
 
 There are many custom flags available for user-specified inputs. The following flags are currently supported:\
@@ -19,6 +21,8 @@ There are many custom flags available for user-specified inputs. The following f
  --divfs: Specifies the largest frequency to consider. Frequency = linspace(fs/adivfs, nwin). Fs is the frames per second, usually 1000. \
  --epochs: Specifies the number of training epochs.\
  --bs: Specifies the training batch-size.\
+ --pearson: Specifies the use of pearson correlation matrix for GED computation.\ 
+ --nopearson: Specifies the covariance matrix to be used for GED computation.\
  --nosave: This will tell the script NOT to save the final model or variables. \
  --save : This will save the state of the trained model to a .pth file and the necessary variables to a .npz file. This feature will also prompt the results to be written into the lfpnetlog.csv file. The file should have headers: 
 ['date', 'day_code', 'region', 'model', 'basemodality','w', 'nbins','divfs', 'frequency_bands', 'batch_size', 'epochs', 'accuracy', 'touch accuracy', 'puff accuracy', 'filename']
