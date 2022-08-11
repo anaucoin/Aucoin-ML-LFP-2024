@@ -113,6 +113,8 @@ class LFPnet(nn.Module):
         x = self.drop(x)
         x = self.fc2(x)
         
+        # add linear layer regression to fix 
+        
         return x
 
 
@@ -185,6 +187,36 @@ def getdatasplits(splits, perms, puff, touch):
     testtags = torch.LongTensor(testtags)
     
     return trainset, valset, testset, traintags, valtags, testtags
+
+def getcontactinds(sessdate,numchan,region):
+    allchan = set(range(0,numchan))
+    # specify which half of contacts to ignore 
+    if region == '3b':
+        ighalf = set(range(int(numchan/2),numchan))
+    elif region == 'amygdala':
+        ighalf = set(range(0,int(numchan/2)))
+    
+    if sessdate == '060619':
+        indices = allchan - {3,4} - ighalf
+    elif sessdate == '061819':
+        indices = allchan - {1} - ighalf 
+    elif sessdate == '062019':
+        indices = allchan - {29} - ighalf 
+    elif sessdate == '062419':
+        indices = allchan - {3} - ighalf 
+    elif sessdate == '071019':
+        indices = allchan - {10, 42} - ighalf 
+    elif sessdate == '071219':
+        indices = allchan - {39, 60} - ighalf 
+    elif sessdate == '071819':
+        indices = allchan - {57} - ighalf 
+    elif sessdate == '080619':
+        indices = allchan - {16, 43, 48} - ighalf 
+    else: 
+        indices = allchan - ighalf
+    return list(indices)
+
+
 # -
 
 import time
@@ -199,9 +231,9 @@ if __name__ ==  '__main__':
     if use_cuda: 
         args = parser.parse_args()
     else: 
-        args = Namespace(d=9, r='amygdala', bm = 'touch',
-                         seg='base',w = 5,epochs = 30,lr = 0.0001, 
-                         bs = 30, nwin = 256, divfs = 10, m= 'ged',
+        args = Namespace(d=9, r='amygdala', bm = 'puff',
+                         seg='base',w = 25,epochs = 30,lr = 0.0001, 
+                         bs = 30, nwin = 256, divfs = 10, m= 'pca',
                          csv = 'standstats.csv', scaler='none', save = True, pearson = False)
 
     # set manual random seed (useful for debugging/analysis during training)
@@ -224,38 +256,6 @@ if __name__ ==  '__main__':
 
     tags = df['modality']
 
-    if args.pearson: 
-        if use_cuda:
-            if args.r == 'amygdala':
-                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_pearsonrged_maps.npz'
-            else:
-                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_pearsonrged_maps_3b.npz'
-        else:
-            if args.r == 'amygdala':
-                sfilename = 'RMC_pearsonrged_maps.npz'
-            else:
-                sfilename = 'RMC_pearsonrged_maps_3b.npz'   
-    else: 
-        if use_cuda:
-            if args.r == 'amygdala':
-                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_ged_maps_amygdala.npz'
-            else:
-                sfilename = '/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_ged_maps_3b.npz'
-        else:
-            if args.r == 'amygdala':
-                sfilename = 'RMC_ged_maps_amygdala.npz'
-            else:
-                sfilename = 'RMC_ged_maps_3b.npz'  
-
-    with np.load(sfilename, allow_pickle=True) as alldata:
-        puffmaps = alldata['puffmaps']
-        touchmaps = alldata['touchmaps']
-
-    if args.bm == 'touch':
-        gedfilt = touchmaps[args.d]
-    else:
-        gedfilt = puffmaps[args.d]
-
     oldn = np.shape(olddata)[2]
     oldt, dt = np.linspace(-1,1,oldn, retstep = True)
 
@@ -268,24 +268,62 @@ if __name__ ==  '__main__':
 
     t = oldt[bind]
 
-    #collecting the right cells 
-    numchan = np.shape(gedfilt)[0]
-    if args.r == 'amygdala':
-        data = olddata[:,-numchan:,bind]
-    else: 
-        data = olddata[:,:numchan:,bind]
+    if args.m == 'ged':
+        if args.pearson: 
+            if use_cuda:
+                sfilename = f'/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_ged_maps_pearson_{args.r}.npz'
+            else:
+                sfilename = f'RMC_ged_maps_pearson_{args.r}.npz' 
+        else: 
+            if use_cuda:
+                sfilename = f'/u1/aucoin/extradrive1/aucoin/python_lfpnet/RMC_ged_maps_{args.r}.npz'
+            else:
+                sfilename = f'RMC_ged_maps_{args.r}.npz' 
 
-    # meanzero data 
-    data = data - np.mean(data, axis=2)[:,:,None]
+        with np.load(sfilename, allow_pickle=True) as alldata:
+            puffmaps = alldata['puffmaps']
+            touchmaps = alldata['touchmaps']
+            
+        if args.bm == 'touch':
+            modelfilt = touchmaps[args.d]
+        else:
+            modelfilt = puffmaps[args.d]  
 
-    gedtimeseries = np.dot(gedfilt,data[0,:,:])
+        contactinds = getcontactinds(sessdate,olddata.shape[1],args.r) 
 
-    numtrials = np.shape(data)[0]
-    lent = len(t)
-    geddata = np.empty((numtrials,lent), dtype= np.float64)
+        #collecting the right cells 
+        numchan = np.shape(modelfilt)[0]
+        data = np.take(olddata, contactinds, axis=1)[:,:,bind]
 
-    for i in range(numtrials):
-        geddata[i,:] = np.dot(gedfilt,data[i,:,:])
+        # meanzero data 
+        data = data - np.mean(data, axis=2)[:,:,None]
+
+        numtrials = np.shape(data)[0]
+        lent = len(t)
+        modeldata = np.empty((numtrials,lent), dtype= np.float64)
+
+        for i in range(numtrials):
+            modeldata[i,:] = np.dot(modelfilt,data[i,:,:])
+        
+        puffind = np.where(tags == 'puff')
+        touchind = np.where(tags == 'touch')
+        numpuff = np.size(puffind)
+        numtouch = np.size(touchind)
+            
+    elif args.m == 'pca':
+        if use_cuda: 
+            sfilename = f'/u1/aucoin/extradrive1/aucoin/python_lfpnet/{sessdate}fullpca_{args.r}.npz'
+        else:
+            sfilename = f'{sessdate}fullpca_{args.r}.npz'
+        
+        with np.load(sfilename, allow_pickle=True) as alldata:
+            puff = alldata['puffpca'][0,:,:]
+            touch = alldata['touchpca'][0,:,:]
+            numpuff = puff.shape[0]
+            numtouch = touch.shape[0]
+            modeldata = np.vstack((puff,touch))
+            puffind = [range(numpuff)]
+            touchind = [range(numpuff, numpuff+numtouch)]
 
     fs = 1/dt
     freq = np.linspace(1,fs/args.divfs, args.nwin)
@@ -293,12 +331,8 @@ if __name__ ==  '__main__':
 
     specdata = np.empty((numtrials, args.nwin,lent), dtype= np.float64)
     for i in range(numtrials):
-        specdata[i,:] = abs(signal.cwt(geddata[i,:], signal.morlet2, widths, w=args.w))
+        specdata[i,:] = abs(signal.cwt(modeldata[i,:], signal.morlet2, widths, w=args.w))
 
-    puffind = np.where(tags == 'puff')
-    touchind = np.where(tags == 'touch')
-    numpuff = np.size(puffind)
-    numtouch = np.size(touchind)
     diff = numpuff-numtouch
     
     #sample touch to have same number of trials as puff 
@@ -482,3 +516,10 @@ if __name__ ==  '__main__':
         plt.plot(np.array(trainhistory)/len(trainloader), label='train')
         plt.plot(np.array(valhistory)/len(valloader), label = 'val')
         plt.legend()
+        
+        #np.savez('ged_spec.npz', date = sessdate, day = args.d, puff = puff, touch = touch, w = args.w, nwin = args.nwin,
+        # divfs = args.divfs, freqrange = (freq[0], freq[-1]), segment = args.seg, region= args.r)
+
+
+
+
