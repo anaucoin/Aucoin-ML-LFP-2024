@@ -298,8 +298,6 @@ if __name__ ==  '__main__':
         # meanzero data 
         data = data - np.mean(data, axis=2)[:,:,None]
 
-        numtrials = np.shape(data)[0]
-        lent = len(t)
         modeldata = np.empty((numtrials,lent), dtype= np.float64)
 
         for i in range(numtrials):
@@ -329,6 +327,8 @@ if __name__ ==  '__main__':
     freq = np.linspace(1,fs/args.divfs, args.nwin)
     widths = args.w*fs / (2*freq*np.pi)
 
+    numtrials = modeldata.shape[0]
+    lent = len(t)
     specdata = np.empty((numtrials, args.nwin,lent), dtype= np.float64)
     for i in range(numtrials):
         specdata[i,:] = abs(signal.cwt(modeldata[i,:], signal.morlet2, widths, w=args.w))
