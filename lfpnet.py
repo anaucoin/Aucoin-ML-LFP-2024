@@ -297,7 +297,9 @@ if __name__ ==  '__main__':
 
         # meanzero data 
         data = data - np.mean(data, axis=2)[:,:,None]
-
+        
+        numtrials = data.shape[0]
+        lent = len(t)
         modeldata = np.empty((numtrials,lent), dtype= np.float64)
 
         for i in range(numtrials):
