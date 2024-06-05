@@ -3,7 +3,7 @@ This project contains Python scripts for reproducing the results in "Detection o
 
 Details of CNN architecture were inspired Golshan, Hebb, and  Mahoor. LFP-Net: A deep learning framework to recognize human behavioral activities using brain STN-LFP signals. Journal of Neuroscience Methods (2020) https://doi.org/10.1016/j.jneumeth.2020.108621. 
 
-## Machine Learning Methods
+## CNN and SVM
 To run analysis using the CNN, SVM, and Linear SVM methods, run lfp-cnn.py, lfp-svm.py and lfp-svm-linear.py respectively. Make sure you are in a folder with the .py script, the amygdala_anatomy.csv file and the relevant data in the .npz format.
 The scripts can be run from command line with the default parameters by calling the desired script name:
 
@@ -29,7 +29,7 @@ There are many custom flags available for user-specified inputs. The following f
  --save : This will save the state of the trained model to a .pth file and the necessary variables to a .npz file. 
 
 
-## Some useful bash scripts 
+### Some useful bash scripts 
 Below is an example bash script to run the code. You may modify the script name and add/remove flags to fit your needs.
 ```text
 #!/usr/bin/env bash
