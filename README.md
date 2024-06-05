@@ -1,15 +1,13 @@
-# LFPnet
+# Introduction
 This project contains Python scripts for reproducing the results in "Detection of latent brain states from baseline neural activity in the amygdala" (Aucoin et. al. 2024)
 
 Details of CNN architecture were inspired Golshan, Hebb, and  Mahoor. LFP-Net: A deep learning framework to recognize human behavioral activities using brain STN-LFP signals. Journal of Neuroscience Methods (2020) https://doi.org/10.1016/j.jneumeth.2020.108621. 
 
-## To run lfp-cnn.py
-Make sure you are in a folder with the .py script, the amygdala_anatomy.csv file and the relevant data in the .npz format.
-The script can be run from command line with the default parameters by calling the script name:
+## Machine Learning Methods
+To run analysis using the CNN, SVM, and Linear SVM methods, run lfp-cnn.py, lfp-svm.py and lfp-svm-linear.py respectively. Make sure you are in a folder with the .py script, the amygdala_anatomy.csv file and the relevant data in the .npz format.
+The scripts can be run from command line with the default parameters by calling the desired script name:
 
 NOTE: Currenlty, these flags are only supported when use_cuda is available. To change the inputs on a local machine when cuda is unavaible, one can update the initialization of the Namespace object (args). 
-
->  python lfpnet.py 
 
 There are many custom flags available for user-specified inputs. The following flags are currently supported:\
  --monkey: Specifies the name of the subject to analyze.\
@@ -50,4 +48,7 @@ do
         done
 done
 ```
+
+## RSA.py
+This script computes the RSA strength for each session and computes the one-sided t-test to compare airflow vs. grooming. Simply call this script by name to run. 
 
