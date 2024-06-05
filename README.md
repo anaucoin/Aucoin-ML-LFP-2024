@@ -33,7 +33,7 @@ There are many custom flags available for user-specified inputs. The following f
 Below is an example bash script to run the code. You may modify the script name and add/remove flags to fit your needs.
 ```text
 #!/usr/bin/env bash
-cd paht/to/files
+cd path/to/files
 nuclei=('C' 'B' 'AB' 'L')
 csvname="lfp-cnn.csv"
 script="lfp-cnn.py"
