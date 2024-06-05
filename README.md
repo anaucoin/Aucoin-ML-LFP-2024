@@ -1,10 +1,10 @@
 # LFPnet
-This project contains a mix of Python and Julia scripts for neural recording analysis using principal component analysis (PCA), generalized eigendecomposition (GED) and LFPNet, a deep convolutional neural network designed to classify time-frequency spectrograms of local field potential (LFP) recordings.
+This project contains Python scripts for reproducing the results in "Detection of latent brain states from baseline neural activity in the amygdala" (Aucoin et. al. 2024)
 
 Details on LFPNet can be found in Golshan, Hebb, and  Mahoor. LFP-Net: A deep learning framework to recognize human behavioral activities using brain STN-LFP signals. Journal of Neuroscience Methods (2020) https://doi.org/10.1016/j.jneumeth.2020.108621. 
 
-## To run lfpnet.py
-Make sure you are in a folder with the lfpnet.py script and data in the .npz format.
+## To run .py
+Make sure you are in a folder with the .py script and data in the .npz format.
 The script can be run from command line with the default parameters by calling the script name:
 
 NOTE: Currenlty, these flags are only supported when use_cuda is available. To change the inputs on personal machine, one can update the initialization of the Namespace object (args). 
