@@ -1,5 +1,5 @@
 # Introduction
-This project contains Python scripts for reproducing the results in "Detection of latent brain states from spontaneous neural activity in the amygdala" (Aucoin et. al. 2024) 10.1371/journal.pcbi.1012247
+This project contains Python scripts for reproducing the results in "Detection of latent brain states from spontaneous neural activity in the amygdala" (Aucoin et. al. 2024) https://doi.org/10.1371/journal.pcbi.1012247
 
 Details of CNN architecture were inspired Golshan, Hebb, and  Mahoor. LFP-Net: A deep learning framework to recognize human behavioral activities using brain STN-LFP signals. Journal of Neuroscience Methods (2020) https://doi.org/10.1016/j.jneumeth.2020.108621. 
 
